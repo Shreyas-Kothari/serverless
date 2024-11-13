@@ -1,0 +1,23 @@
+name: Java Pull Request Check
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+    maven_build:
+        name: Maven Build package
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up JDK 17
+              uses: actions/setup-java@v4
+              with:
+                java-version: '17'
+                distribution: 'temurin'
+
+            - name: Build with Maven
+              working-directory: ./ServerlessEmailLambda
+              run: mvn clean package
