@@ -49,7 +49,7 @@ These values must be configured in the AWS Lambda environment for the function t
 
 ## Usage
 
-Once deployed, the Lambda function listens for incoming SNS events. Each event should contain a JSON payload structured as follows:
+Once deployed, the Lambda function listens for incoming SNS events. Each event should contain JSON payload structured as follows:
 
 ```json
 {
