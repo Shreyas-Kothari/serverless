@@ -24,7 +24,7 @@ public class EmailHandler implements RequestHandler<SNSEvent, String> {
                 .from("noreply@" + mailGunDomainName)
                 .to(sender)
                 .subject(subject)
-                .text(body)
+                .html(body)
                 .build();
 
         return mailgunMessagesApi.sendMessage(mailGunDomainName, message);
@@ -34,6 +34,7 @@ public class EmailHandler implements RequestHandler<SNSEvent, String> {
     public String handleRequest(SNSEvent event, Context context) {
         ObjectMapper objectMapper = new ObjectMapper();
         LambdaLogger log = context.getLogger();
+        log.log("Event started/triggered "+ event);
 
         for(SNSEvent.SNSRecord record: event.getRecords()){
             String message = record.getSNS().getMessage();
