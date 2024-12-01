@@ -6,19 +6,31 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.SNSEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mailgun.api.v3.MailgunMessagesApi;
 import com.mailgun.client.MailgunClient;
 import com.mailgun.model.message.Message;
 import com.mailgun.model.message.MessageResponse;
 import org.shreyas.model.EmailRequest;
+import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse;
+import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundException;
 
+import javax.management.ServiceNotFoundException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Map;
 
 public class EmailHandler implements RequestHandler<SNSEvent, String> {
-    private static final String mailGunDomainName = System.getenv("MAIL_GUN_DOMAIN_NAME");
-    private static final String mailGunApiKey = System.getenv("MAIL_GUN_API_KEY");
+    private static String mailGunDomainName;
+    private static String mailGunApiKey;
     private static LambdaLogger log;
+    private static final String region = System.getenv("REGION");
+    private static final String secretManagerName = System.getenv("SECRET_MANAGER_NAME");
 
     public static MessageResponse sendEmail(String sender, String subject, String body) {
 
@@ -41,9 +53,13 @@ public class EmailHandler implements RequestHandler<SNSEvent, String> {
     public String handleRequest(SNSEvent event, Context context) {
         ObjectMapper objectMapper = new ObjectMapper();
         log = context.getLogger();
-
         log.log("bing google");
         bingMethod();
+        try {
+            getSecretsFromSecretManager();
+        } catch (ServiceNotFoundException e) {
+            throw new RuntimeException(e);
+        }
         for (SNSEvent.SNSRecord record : event.getRecords()) {
             String message = record.getSNS().getMessage();
             log.log("Message from SNS: " + message);
@@ -58,6 +74,35 @@ public class EmailHandler implements RequestHandler<SNSEvent, String> {
             }
         }
         return "No valid email request found in the input payload";
+    }
+
+    private void getSecretsFromSecretManager() throws ServiceNotFoundException {
+        SecretsManagerClient client = SecretsManagerClient.builder()
+                .region(Region.of(region))
+                .credentialsProvider(InstanceProfileCredentialsProvider.create())
+                .build();
+
+        GetSecretValueRequest request = GetSecretValueRequest.builder()
+               .secretId(secretManagerName)
+               .build();
+
+        try{
+            log.log("Setting up the secrets from the secret manager");
+            GetSecretValueResponse response = client.getSecretValue(request);
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+            Map<String, String> secrets = mapper.readValue(response.secretString(), Map.class);
+            mailGunDomainName=secrets.get("MAIL_GUN_DOMAIN_NAME");
+            mailGunApiKey=secrets.get("MAIL_GUN_API_KEY");
+            log.log("Retrieved secrets from secret manager");
+        }catch (ResourceNotFoundException e) {
+            throw new ServiceNotFoundException("Could not find secret manager with name: " + secretManagerName);
+        }
+        catch (Exception e) {
+            throw new RuntimeException("Failed to get secret", e);
+        }
     }
 
     public void bingMethod() {
