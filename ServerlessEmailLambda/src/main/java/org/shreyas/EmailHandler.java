@@ -13,7 +13,7 @@ import com.mailgun.client.MailgunClient;
 import com.mailgun.model.message.Message;
 import com.mailgun.model.message.MessageResponse;
 import org.shreyas.model.EmailRequest;
-import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
@@ -53,7 +53,7 @@ public class EmailHandler implements RequestHandler<SNSEvent, String> {
     public String handleRequest(SNSEvent event, Context context) {
         ObjectMapper objectMapper = new ObjectMapper();
         log = context.getLogger();
-        log.log("bing google");
+        log.log("ping google");
         bingMethod();
         try {
             getSecretsFromSecretManager();
@@ -71,6 +71,10 @@ public class EmailHandler implements RequestHandler<SNSEvent, String> {
                 return response.getMessage();
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
+            } catch (Exception e) {
+                log.log("Exception occurred: " + e.getMessage());
+                e.printStackTrace();
+                throw new RuntimeException(e);
             }
         }
         return "No valid email request found in the input payload";
@@ -79,7 +83,7 @@ public class EmailHandler implements RequestHandler<SNSEvent, String> {
     private void getSecretsFromSecretManager() throws ServiceNotFoundException {
         SecretsManagerClient client = SecretsManagerClient.builder()
                 .region(Region.of(region))
-                .credentialsProvider(InstanceProfileCredentialsProvider.create())
+                .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
 
         GetSecretValueRequest request = GetSecretValueRequest.builder()
